@@ -1,0 +1,281 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recursive Binary Tree Fractal Clock</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: #0c0c0c;
+        }
+    </style>
+</head>
+<body>
+<script>
+// Configuration
+const THREE_TREES = false;
+const SHOW_CENTER_DIGITAL = true;
+const SHOW_SCAFFOLD = true;
+const ENABLE_PULSES = true;
+
+// Tree Parameters
+const THETA = 24;
+const SCALEF = 0.70;
+const DEPTH = 6;
+
+// Colors
+const COLOR_HOURS = [255, 150, 80];
+const COLOR_MINUTES = [120, 255, 160];
+const COLOR_SECONDS = [90, 200, 255];
+
+// Animation
+let pulses = { h: 0, m: 0, s: 0 };
+let prev = { h: -1, m: -1, s: -1 };
+
+// Store all leaf positions (there are 64 leaves at depth 6)
+let leaves = [];
+
+function setup() {
+    createCanvas(windowWidth || 900, windowHeight || 600);
+    angleMode(DEGREES);
+    textAlign(CENTER, CENTER);
+    frameRate(60);
+}
+
+function windowResized() {
+    resizeCanvas(windowWidth, windowHeight);
+}
+
+function draw() {
+    background(12);
+    
+    let h = hour();
+    let m = minute();
+    let s = second();
+    
+    // Update pulses
+    if (ENABLE_PULSES) {
+        if (h !== prev.h) { pulses.h = 1; prev.h = h; }
+        if (m !== prev.m) { pulses.m = 1; prev.m = m; }
+        if (s !== prev.s) { pulses.s = 1; prev.s = s; }
+        
+        pulses.h *= 0.95;
+        pulses.m *= 0.93;
+        pulses.s *= 0.91;
+    }
+    
+    if (THREE_TREES) {
+        drawThreeTrees(h, m, s);
+    } else {
+        drawSingleTree(h, m, s);
+    }
+    
+    if (SHOW_CENTER_DIGITAL) {
+        push();
+        fill(255, 80);
+        textSize(13);
+        text(nf(h, 2) + ':' + nf(m, 2) + ':' + nf(s, 2), width / 2, height - 20);
+        pop();
+    }
+}
+
+function drawSingleTree(h, m, s) {
+    push();
+    translate(width / 2, height - 50);
+    
+    leaves = [];
+    let baseLen = height * 0.18;
+    
+    // Draw complete tree and collect leaf positions
+    drawFullTreeAndCollectLeaves(0, DEPTH, baseLen, 0);
+    
+    // Sort leaves by position index for consistent mapping
+    leaves.sort((a, b) => a.index - b.index);
+    
+    // Map time to leaf positions
+    // Hours: map 0-23 to positions 0-31 (using first 32 leaves)
+    // Minutes: map 0-59 to all 64 leaves
+    // Seconds: map 0-59 to all 64 leaves
+    
+    let hLeaf = Math.floor(map(h, 0, 24, 0, 32));
+    let mLeaf = Math.floor(map(m, 0, 60, 0, 64));
+    let sLeaf = Math.floor(map(s, 0, 60, 0, 64));
+    
+    // Draw paths to these leaves
+    drawPathToLeaf(0, DEPTH, baseLen, hLeaf, COLOR_HOURS, 5, pulses.h);
+    drawPathToLeaf(0, DEPTH, baseLen, mLeaf, COLOR_MINUTES, 6, pulses.m);
+    drawPathToLeaf(0, DEPTH, baseLen, sLeaf, COLOR_SECONDS, 6, pulses.s);
+    
+    pop();
+    
+    // Draw badges
+    if (leaves[hLeaf]) {
+        drawBadge(leaves[hLeaf].x, leaves[hLeaf].y, h, COLOR_HOURS, 'H', (h + m/60) / 24);
+    }
+    if (leaves[mLeaf]) {
+        drawBadge(leaves[mLeaf].x, leaves[mLeaf].y, m, COLOR_MINUTES, 'M', m / 60);
+    }
+    if (leaves[sLeaf]) {
+        drawBadge(leaves[sLeaf].x, leaves[sLeaf].y, s, COLOR_SECONDS, 'S', s / 60);
+    }
+}
+
+function drawThreeTrees(h, m, s) {
+    let spacing = width / 3;
+    let baseLen = height * 0.12;
+    
+    // Hours
+    push();
+    translate(spacing / 2, height - 50);
+    leaves = [];
+    drawFullTreeAndCollectLeaves(0, DEPTH, baseLen, 0);
+    leaves.sort((a, b) => a.index - b.index);
+    let hLeaf = Math.floor(map(h, 0, 24, 0, min(32, leaves.length)));
+    drawPathToLeaf(0, DEPTH, baseLen, hLeaf, COLOR_HOURS, 5, pulses.h);
+    pop();
+    if (leaves[hLeaf]) {
+        drawBadge(leaves[hLeaf].x, leaves[hLeaf].y, h, COLOR_HOURS, 'H', (h + minute()/60) / 24);
+    }
+    
+    // Minutes
+    push();
+    translate(width / 2, height - 50);
+    leaves = [];
+    drawFullTreeAndCollectLeaves(0, DEPTH, baseLen, 0);
+    leaves.sort((a, b) => a.index - b.index);
+    let mLeaf = Math.floor(map(m, 0, 60, 0, leaves.length));
+    drawPathToLeaf(0, DEPTH, baseLen, mLeaf, COLOR_MINUTES, 6, pulses.m);
+    pop();
+    if (leaves[mLeaf]) {
+        drawBadge(leaves[mLeaf].x, leaves[mLeaf].y, m, COLOR_MINUTES, 'M', m / 60);
+    }
+    
+    // Seconds
+    push();
+    translate(width - spacing / 2, height - 50);
+    leaves = [];
+    drawFullTreeAndCollectLeaves(0, DEPTH, baseLen, 0);
+    leaves.sort((a, b) => a.index - b.index);
+    let sLeaf = Math.floor(map(s, 0, 60, 0, leaves.length));
+    drawPathToLeaf(0, DEPTH, baseLen, sLeaf, COLOR_SECONDS, 6, pulses.s);
+    pop();
+    if (leaves[sLeaf]) {
+        drawBadge(leaves[sLeaf].x, leaves[sLeaf].y, s, COLOR_SECONDS, 'S', s / 60);
+    }
+}
+
+function drawFullTreeAndCollectLeaves(depth, maxDepth, len, index) {
+    // Draw branch
+    if (SHOW_SCAFFOLD) {
+        strokeWeight(map(depth, 0, maxDepth, 6, 1));
+        stroke(255, 26);
+        line(0, 0, 0, -len);
+    }
+    
+    // If at max depth, this is a leaf
+    if (depth === maxDepth) {
+        let m = drawingContext.getTransform();
+        leaves.push({
+            x: m.e,
+            y: m.f - len,
+            index: index
+        });
+        return index + 1;
+    }
+    
+    // Recurse
+    let newLen = len * SCALEF;
+    let nextIndex = index;
+    
+    // Left subtree
+    push();
+    translate(0, -len);
+    rotate(-THETA);
+    nextIndex = drawFullTreeAndCollectLeaves(depth + 1, maxDepth, newLen, nextIndex);
+    pop();
+    
+    // Right subtree
+    push();
+    translate(0, -len);
+    rotate(THETA);
+    nextIndex = drawFullTreeAndCollectLeaves(depth + 1, maxDepth, newLen, nextIndex);
+    pop();
+    
+    return nextIndex;
+}
+
+function drawPathToLeaf(depth, maxDepth, len, targetLeafIndex, color, targetDepth, pulse) {
+    if (depth > targetDepth || depth > maxDepth) return;
+    
+    // Calculate which way to go at each level to reach target leaf
+    let pathBits = targetLeafIndex.toString(2).padStart(maxDepth, '0');
+    
+    push();
+    for (let i = 0; i <= targetDepth && i <= maxDepth; i++) {
+        // Draw segment
+        let weight = map(i, 0, maxDepth, 7, 2);
+        if (color === COLOR_MINUTES) weight *= 0.8;
+        if (color === COLOR_SECONDS) weight *= 0.6;
+        
+        strokeWeight(weight * (1 + pulse * 0.3));
+        stroke(color[0], color[1], color[2], 200 + pulse * 55);
+        line(0, 0, 0, -len);
+        
+        // Move to next position
+        if (i < maxDepth) {
+            translate(0, -len);
+            if (i < pathBits.length && pathBits[i] === '1') {
+                rotate(THETA);
+            } else {
+                rotate(-THETA);
+            }
+            len *= SCALEF;
+        }
+    }
+    pop();
+}
+
+function drawBadge(x, y, value, color, label, progress) {
+    let r = label === 'H' ? 22 : label === 'M' ? 19 : 16;
+    
+    // Glow
+    noStroke();
+    fill(color[0], color[1], color[2], 18);
+    ellipse(x, y, r * 3.5);
+    
+    // Progress arc
+    push();
+    translate(x, y);
+    noFill();
+    strokeWeight(1.5);
+    stroke(color[0], color[1], color[2], 100);
+    strokeCap(ROUND);
+    arc(0, 0, r * 2 + 5, r * 2 + 5, -90, -90 + progress * 360);
+    pop();
+    
+    // Badge
+    fill(15);
+    stroke(color[0], color[1], color[2]);
+    strokeWeight(1.5);
+    ellipse(x, y, r * 2);
+    
+    // Value
+    fill(245);
+    noStroke();
+    textSize(r * 0.65);
+    textStyle(BOLD);
+    text(nf(value, 2), x, y);
+    
+    // Label
+    fill(color[0], color[1], color[2]);
+    textSize(8);
+    text(label, x, y + r + 7);
+}
+</script>
+</body>
+</html>
